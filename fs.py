@@ -45,6 +45,12 @@ collected=''
 on_table=''
 
 
+col_sep = (13, 105, 172)
+col_collected = (255, 0, 0)
+col_table = (255, 191, 0)
+draw_fill=1
+
+
 
 
 def avg_fps_counter(window_size):
@@ -211,6 +217,9 @@ obsFrames = 0
 #for frame1 in camera.capture_continuous(rawCapture, format="bgr",use_video_port=True):
 while True:
     currently_seen=set()
+    
+    
+    
 
     # Start timer (for calculating frame rate)
     t1 = cv2.getTickCount()
@@ -246,6 +255,18 @@ while True:
     scores = OrderAccuracyUtils.output_tensor(interpreter, 0)
     #rects variable
     rects =[]
+    
+    
+    #Draw Separations on screen
+    box_w=0.25
+    box_border=3
+    bow_x=int(imW * box_w)
+
+    cv2.rectangle(frame, (bow_x, 0), (bow_x+box_border, imH), col_sep, -1)
+
+    
+    
+    
   
     # Loop over all detections and draw detection box if confidence is above minimum threshold
     
@@ -266,7 +287,15 @@ while True:
             rects.append(box.astype("int"))
 
             (startX, startY, endX, endY) = box.astype("int")
-            cv2.rectangle(frame, (startX, startY), (endX, endY), (10, 255, 0), 2)
+            
+            if(((endX+startX)/2) < bow_x):
+                col_draw=col_collected
+                draw_fill=5
+            else:
+                col_draw=col_table
+                draw_fill=1
+                
+            cv2.rectangle(frame, (startX, startY), (endX, endY), col_draw, draw_fill)
 
             # Draw label
             label = '%s: %d%%' % (object_name, int(scores[i]*100)) # Example: 'person: 72%'
