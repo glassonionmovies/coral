@@ -44,12 +44,15 @@ seen=set()
 collected=''
 on_table=''
 
+ObjUID={}
+
 
 col_sep = (13, 105, 172)
 col_collected = (255, 0, 0)
 col_table = (255, 191, 0)
 draw_fill=1
-
+col_centroid = (255, 0, 0)
+col_text = (255, 0, 0)
 
 
 
@@ -126,7 +129,7 @@ parser.add_argument('--resolution', help='Desired webcam resolution in WxH. If t
                     default='640x480')
 parser.add_argument('--edgetpu', help='Use Coral Edge TPU Accelerator to speed up detection',
                     action='store_true', default=True)
-parser.add_argument('--sf', help='Minimum confidence threshold for displaying detected objects',
+parser.add_argument('--sf', help='Resize display',
                     default=1)
 
 
@@ -255,6 +258,8 @@ while True:
     scores = OrderAccuracyUtils.output_tensor(interpreter, 0)
     #rects variable
     rects =[]
+    label_cent = []
+    #ObjUID
     
     
     #Draw Separations on screen
@@ -274,7 +279,7 @@ while True:
         if ((scores[i] > min_conf_threshold) and (scores[i] <= 1.0)):
             
             object_name = labels[int(classes[i])] # Look up object name from "labels" array using class index
-            print(f"Object name is {object_name}")
+            #print(f"Object name is {object_name}")
             
             # Get bounding box coordinates and draw box
             # Interpreter can return coordinates that are outside of image dimensions, need to force them to be within image using max() and min()
@@ -285,6 +290,9 @@ while True:
             box = np.array([xmin,ymin,xmax,ymax])
 
             rects.append(box.astype("int"))
+#            label_cent.append((object_name, box.astype("int")))
+            label_cent.append((object_name, (int((xmin+xmax)/2), int((ymax+ymin)/2))))
+            
 
             (startX, startY, endX, endY) = box.astype("int")
             
@@ -305,14 +313,43 @@ while True:
             #print(f"seen is {seen}")
 
             
-            print(f"label is --- {label}")
-            labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.7, 2) # Get font size
+            #print(f"label is --- {label}")
+            labelSize, baseLine = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.1, 1) # Get font size
             label_ymin = max(ymin, labelSize[1] + 10) # Make sure not to draw label too close to top of window
-            cv2.rectangle(frame, (xmin, label_ymin-labelSize[1]-10), (xmin+labelSize[0], label_ymin+baseLine-10), (255, 255, 255), cv2.FILLED) # Draw white box to put label text in
-            cv2.putText(frame, label, (xmin, label_ymin-7), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2) # Draw label text
+            #cv2.rectangle(frame, (xmin, label_ymin-labelSize[1]-10), (xmin+labelSize[0], label_ymin+baseLine-10), (255, 255, 255), cv2.FILLED) # Draw white box to put label text in
+            cv2.putText(frame, label, (xmin, label_ymin-7), cv2.FONT_HERSHEY_SIMPLEX, 0.3, col_text, 1) # Draw label text
 
     #update the centroid for the objects
     objects = ct.update(rects)
+    #label_cent_dict={value: key for (key, value) in label_cent}
+    label_cent_dict={f"{value[0]} {value[1]}": key for (key, value) in label_cent}
+    
+    print(f" label cent dist {label_cent_dict}")
+
+
+    #global ObjUID
+    
+    for (objectID, centroid) in objects.items():
+        ke=f"{centroid[0]} {centroid[1]}"
+        print(f"ke is {ke} onjectID is {objectID}")
+        if(ke in label_cent_dict.keys()):
+            #ObjUID.append((objectID, label_cent_dict[ke]))
+            print("ke mila")
+            print(f"ObjUID  before is {ObjUID}")
+            ObjUID[objectID] = label_cent_dict[ke]
+            print(f"ObjUID after  is {ObjUID}")
+
+
+    
+    #ObjUID_dict = {value: key for (key, value) in ObjUID}
+    print('______')
+    print('______')
+    print('______')
+    print(ObjUID)
+    print('______')
+    print('______')
+    print('______')
+    print('______')
 
     # calculate the difference between this and the previous frame
     x = DictDiff(objects,old_objects)
@@ -325,21 +362,22 @@ while True:
     for (objectID, centroid) in objects.items():
 		# draw both the ID of the object and the centroid of the
 		# object on the output frame
-        text = "ID {}".format(objectID)
+        
+        
+        text = f"{ObjUID[objectID]} : {objectID}"
+        print(text)
+        print(f"Object id before puttin on image center {objectID}")
         seen.add((object_name, objectID))
         currently_seen.add((object_name, objectID))
         packaged=seen-currently_seen
-        print(f"seen is {seen}")
-        print(f"currently_seen is {currently_seen}")
-        print(f"packaged is {packaged}")
+        #print(f"seen is {seen}")
+        #print(f"currently_seen is {currently_seen}")
+        #print(f"packaged is {packaged}")
 
 
         cv2.putText(frame, text, (centroid[0] - 10, centroid[1] - 10),
-            cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-        cv2.circle(frame, (centroid[0], centroid[1]), 4, (0, 255, 0), -1)         
-
-    # Draw framerate in corner of frame
-    #cv2.putText(frame,'FPS: {0:.2f}'.format(frame_rate_calc),(30,50),cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,0),2,cv2.LINE_AA)
+            cv2.FONT_HERSHEY_SIMPLEX, 0.3, col_text, 1)
+        cv2.circle(frame, (centroid[0], centroid[1]), 4, col_centroid, -1)         
     
     
     l=list(packaged)
@@ -363,16 +401,13 @@ while True:
     
     
     
-    #cv2.putText(frame,str(packaged),(30,60),cv2.FONT_HERSHEY_SIMPLEX,1,(255,255,0),2,cv2.LINE_AA)
-    
     fps_text='FPS: {0:.2f}'.format(frame_rate_calc)
     
     
     display_text=fps_text + collected_text + on_table_text
-    print(f"display text is {display_text}")
     
     cv2.setWindowTitle('Object detector',display_text )
-    if(show_resize_factor > 1):
+    if(show_resize_factor > 1.1):
         frame = cv2.resize(frame, (int(width*show_resize_factor), int(height*show_resize_factor)))
 
     # All the results have been drawn on the frame, so it's time to display it.
@@ -385,28 +420,6 @@ while True:
     #count number of frames for direction calculation
     obsFrames = obsFrames + 1
 
-    #see what the difference in centroids is after every x frames to determine direction of movement
-    #and tally up total number of objects that travelled left or right
-    if obsFrames % 30 == 0:
-        d = {}
-        for k,v in x.items():
-            if v[0] > 3: 
-                d[k] =  "Left"
-                leftcount = leftcount + 1 
-            elif v[0]< -3:
-                d[k] =  "Right"
-                rightcount = rightcount + 1 
-            elif v[1]> 3:
-                d[k] =  "Up"
-            elif v[1]< -3:
-                d[k] =  "Down"
-            else: 
-                d[k] = "Stationary"
-                
-
-                
-        if bool(d):
-            print(d, time.ctime()) # prints the direction of travel (if any) and timestamp
     
 
     # Press 'q' to quit and give the total tally
